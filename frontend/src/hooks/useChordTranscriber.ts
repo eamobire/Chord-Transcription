@@ -159,8 +159,14 @@ export const useChordTranscriber = () => {
             }
             const results = essentia.ChordsDetection(hpcpMatrix);
 
-            // Convert WASM string vector to JS array
-            const rawChords = essentia.vectorToArray(results.chords);
+            // VectorString from WASM cannot use vectorToArray (designed for VectorFloat).
+            // We must iterate manually using the Emscripten binding API.
+            const chordsVec = results.chords;
+            const rawChords: string[] = [];
+            for (let j = 0; j < chordsVec.size(); j++) {
+                rawChords.push(chordsVec.get(j) as string);
+            }
+            console.log(`[Studio-Diagnostic] First 5 raw chords:`, rawChords.slice(0, 5));
 
             // Cleanup matrix and result vectors
             hpcpMatrix.delete();
