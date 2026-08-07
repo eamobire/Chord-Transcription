@@ -57,6 +57,7 @@ export const useChordTranscriber = () => {
             console.log("[Studio-Diagnostic] Essentia.js engine active and ready.");
 
             const channelData = audioBuffer.getChannelData(0);
+            const sampleRate = audioBuffer.sampleRate;
 
             const frameSize = 4096;
             const hopSize = 2048;
@@ -94,7 +95,7 @@ export const useChordTranscriber = () => {
                 }
 
                 // 3. SpectralPeaks
-                const peaksResult = essentia.SpectralPeaks(spectrum);
+                const peaksResult = essentia.SpectralPeaks(spectrum, undefined, undefined, undefined, undefined, undefined, sampleRate);
                 const frequencies = peaksResult.frequencies;
                 const magnitudes = peaksResult.magnitudes;
 
@@ -108,7 +109,7 @@ export const useChordTranscriber = () => {
                 }
 
                 // 4. HPCP
-                const hpcpResult = essentia.HPCP(frequencies, magnitudes);
+                const hpcpResult = essentia.HPCP(frequencies, magnitudes, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, sampleRate);
                 const hpcpVec = hpcpResult.hpcp || hpcpResult.vector;
 
                 if (i === 0) {
@@ -157,7 +158,7 @@ export const useChordTranscriber = () => {
             for (const h of hpcps) {
                 hpcpMatrix.push_back(h);
             }
-            const results = essentia.ChordsDetection(hpcpMatrix);
+            const results = essentia.ChordsDetection(hpcpMatrix, hopSize, sampleRate);
 
             // VectorString from WASM cannot use vectorToArray (designed for VectorFloat).
             // We must iterate manually using the Emscripten binding API.
