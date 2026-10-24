@@ -1,0 +1,3 @@
+# Generated MIDI exports
+backend/temp_midi/
+__pycache__/

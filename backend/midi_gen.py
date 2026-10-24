@@ -20,11 +20,27 @@ def generate_midi(chords, output_path):
     }
 
     def get_notes(chord_label):
-        root = chord_label.split(':')[0]
-        quality = chord_label.split(':')[1] if ':' in chord_label else "maj"
-        
-        base_note = note_map.get(root, 60)
-        
+        # Accepts "C:maj" style labels as well as Essentia's "C", "G#m", "Bbm" style
+        if ':' in chord_label:
+            root, quality = chord_label.split(':', 1)
+        else:
+            root = chord_label[:2] if chord_label[1:2] in ('#', 'b') else chord_label[:1]
+            suffix = chord_label[len(root):]
+            if suffix.startswith('dim'):
+                quality = "dim"
+            elif suffix.startswith('aug'):
+                quality = "aug"
+            elif suffix.startswith('m') and not suffix.startswith('maj'):
+                quality = "min"
+            else:
+                quality = "maj"
+
+        # "N.C." (no chord) and anything unrecognised produce silence
+        if root not in note_map:
+            return []
+
+        base_note = note_map[root]
+
         if "maj" in quality:
             return [base_note, base_note + 4, base_note + 7]
         elif "min" in quality:

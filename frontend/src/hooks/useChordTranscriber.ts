@@ -56,7 +56,14 @@ export const useChordTranscriber = () => {
             const essentia = new Essentia(backend);
             console.log("[Studio-Diagnostic] Essentia.js engine active and ready.");
 
-            const channelData = audioBuffer.getChannelData(0);
+            // Mix all channels down to mono so instruments panned to either side are analysed
+            const channelData = new Float32Array(audioBuffer.length);
+            for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+                const data = audioBuffer.getChannelData(c);
+                for (let s = 0; s < data.length; s++) {
+                    channelData[s] += data[s] / audioBuffer.numberOfChannels;
+                }
+            }
             const sampleRate = audioBuffer.sampleRate;
 
             const frameSize = 4096;
@@ -66,7 +73,15 @@ export const useChordTranscriber = () => {
             console.log(`Processing ${numFrames} frames...`);
             const discoveredChords: ChordData[] = [];
 
+            // One HPCP per frame, always, so that hpcps[i] (and the chord detected from it)
+            // lines up with frame i's time. Frames with no usable spectrum get a zero HPCP
+            // and are marked silent, which is reported as "N.C." (no chord).
             const hpcps: any[] = [];
+            const silent: boolean[] = [];
+            const pushSilentFrame = () => {
+                hpcps.push(essentia.arrayToVector(new Float32Array(12)));
+                silent.push(true);
+            };
 
             for (let i = 0; i < numFrames; i++) {
                 const start = i * hopSize;
@@ -81,6 +96,7 @@ export const useChordTranscriber = () => {
 
                 if (!windowed) {
                     frameVec.delete();
+                    pushSilentFrame();
                     continue;
                 }
 
@@ -91,6 +107,7 @@ export const useChordTranscriber = () => {
                 if (!spectrum) {
                     frameVec.delete();
                     windowed.delete();
+                    pushSilentFrame();
                     continue;
                 }
 
@@ -105,6 +122,7 @@ export const useChordTranscriber = () => {
                     spectrum.delete();
                     if (frequencies) frequencies.delete();
                     if (magnitudes) magnitudes.delete();
+                    pushSilentFrame();
                     continue;
                 }
 
@@ -129,10 +147,12 @@ export const useChordTranscriber = () => {
                     spectrum.delete();
                     frequencies.delete();
                     magnitudes.delete();
+                    pushSilentFrame();
                     continue;
                 }
 
                 hpcps.push(hpcpVec);
+                silent.push(false);
 
                 // Cleanup WASM memory
                 frameVec.delete();
@@ -150,7 +170,10 @@ export const useChordTranscriber = () => {
 
             console.log("Frame processing complete. Detecting chords...");
 
-            if (hpcps.length === 0) {
+            if (silent.every(s => s)) {
+                for (const h of hpcps) {
+                    h.delete();
+                }
                 throw new Error("No harmonic content detected in the audio file.");
             }
 
@@ -179,7 +202,7 @@ export const useChordTranscriber = () => {
 
             let lastChord = "";
             for (let i = 0; i < rawChords.length; i++) {
-                const chord = rawChords[i];
+                const chord = silent[i] ? "N.C." : rawChords[i];
                 if (chord !== lastChord) {
                     const time = (i * hopSize) / audioBuffer.sampleRate;
                     discoveredChords.push({ time, chord });
