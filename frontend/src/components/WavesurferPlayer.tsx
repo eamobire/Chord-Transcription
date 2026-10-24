@@ -12,6 +12,7 @@ export interface Selection {
 
 interface WavesurferPlayerProps {
     url: string | null;
+    isVideo?: boolean;
     onReady?: (wavesurfer: WaveSurfer) => void;
     onTimeUpdate?: (time: number) => void;
     onSelectionChange?: (selection: Selection | null) => void;
@@ -19,8 +20,9 @@ interface WavesurferPlayerProps {
 
 const SPEEDS = [1, 0.75, 0.5, 0.25];
 
-export const WavesurferPlayer: React.FC<WavesurferPlayerProps> = ({ url, onReady, onTimeUpdate, onSelectionChange }) => {
+export const WavesurferPlayer: React.FC<WavesurferPlayerProps> = ({ url, isVideo = false, onReady, onTimeUpdate, onSelectionChange }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
     const wavesurferRef = useRef<WaveSurfer | null>(null);
     const regionsRef = useRef<RegionsPlugin | null>(null);
     const regionRef = useRef<Region | null>(null);
@@ -62,6 +64,8 @@ export const WavesurferPlayer: React.FC<WavesurferPlayerProps> = ({ url, onReady
             barRadius: 3,
             height: 100,
             normalize: true,
+            // For video files, play through the visible <video> so picture and waveform stay in sync
+            media: isVideo && videoRef.current ? videoRef.current : undefined,
         });
 
         // Drag on the waveform to select a loop; only one selection at a time
@@ -129,7 +133,7 @@ export const WavesurferPlayer: React.FC<WavesurferPlayerProps> = ({ url, onReady
             setHasSelection(false);
             onSelectionChangeRef.current?.(null);
         };
-    }, [url]);
+    }, [url, isVideo]);
 
     const togglePlay = useCallback(() => {
         const ws = wavesurferRef.current;
@@ -167,6 +171,14 @@ export const WavesurferPlayer: React.FC<WavesurferPlayerProps> = ({ url, onReady
 
     return (
         <div className="w-full studio-card p-6 mt-6">
+            {isVideo && (
+                <video
+                    ref={videoRef}
+                    playsInline
+                    onClick={togglePlay}
+                    className="w-full max-h-[420px] rounded-lg bg-black mb-4 cursor-pointer"
+                />
+            )}
             <div ref={containerRef} className="w-full mb-2" />
             <p className="text-[11px] text-white/30 mb-4">
                 Drag across the waveform to select a loop and see its notes and chord guesses.

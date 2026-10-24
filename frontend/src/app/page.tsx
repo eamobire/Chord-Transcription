@@ -11,6 +11,7 @@ import type { ChordData } from '@/types/audio';
 
 export default function Home() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isVideo, setIsVideo] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const { chords, setChords, isTranscribing, progress, transcribeAudio } = useChordTranscriber();
@@ -47,6 +48,8 @@ export default function Home() {
     setError(null);
     setAudioBuffer(null);
     const url = URL.createObjectURL(file);
+    // Some video files (e.g. .mkv) arrive with no MIME type, so fall back to the extension
+    setIsVideo(file.type.startsWith('video/') || /\.(mp4|m4v|mov|webm|mkv|avi)$/i.test(file.name));
     setAudioUrl(url);
 
     // Prepare for transcription
@@ -54,7 +57,13 @@ export default function Home() {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      let audioBuffer: AudioBuffer;
+      try {
+        // Also works for video files: the browser decodes their audio track
+        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      } catch {
+        throw new Error("Couldn't read the audio from this file. For video, try MP4 (AAC audio), WebM or MOV; for audio, WAV, MP3, M4A or AIFF.");
+      }
       setAudioBuffer(audioBuffer);
 
       const result = await transcribeAudio(audioBuffer);
@@ -134,17 +143,17 @@ export default function Home() {
               type="file"
               onChange={handleFileUpload}
               className="absolute inset-0 opacity-0 cursor-pointer"
-              accept="audio/*"
+              accept="audio/*,video/*"
             />
             <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <Upload className="text-white/40 group-hover:text-purple-400" size={32} />
             </div>
-            <p className="text-lg font-medium text-white/80">Drop your music here</p>
-            <p className="text-sm text-white/40 mt-1">WAV, MP3, or AIFF up to 50MB</p>
+            <p className="text-lg font-medium text-white/80">Drop your music or video here</p>
+            <p className="text-sm text-white/40 mt-1">Audio (WAV, MP3, M4A, AIFF) or video (MP4, WebM, MOV) up to 50MB</p>
           </div>
         ) : (
           <>
-            <WavesurferPlayer url={audioUrl} onTimeUpdate={onTimeUpdate} onSelectionChange={setSelection} />
+            <WavesurferPlayer url={audioUrl} isVideo={isVideo} onTimeUpdate={onTimeUpdate} onSelectionChange={setSelection} />
 
             {audioBuffer && (
               <SpectrumPanel
