@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Upload, Music, Loader2, Download, Keyboard } from 'lucide-react';
-import { WavesurferPlayer } from '@/components/WavesurferPlayer';
+import { WavesurferPlayer, type Selection } from '@/components/WavesurferPlayer';
 import { ChordDisplay } from '@/components/ChordDisplay';
+import { SpectrumPanel, type SpectrumMode } from '@/components/SpectrumPanel';
+import { analyseSelection } from '@/lib/pitchAnalysis';
 import { useChordTranscriber } from '@/hooks/useChordTranscriber';
 import type { ChordData } from '@/types/audio';
 
@@ -13,12 +15,37 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const { chords, setChords, isTranscribing, progress, transcribeAudio } = useChordTranscriber();
   const [currentChord, setCurrentChord] = useState<string | null>(null);
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
+
+  const [spectrumMode, setSpectrumMode] = useState<SpectrumMode>('live');
+
+  // Live mode analyses a short window at the playhead, re-run every 1/8 s of audio;
+  // loop mode summarises the whole selection
+  const liveTime = Math.round(currentTime * 8) / 8;
+  const showLoop = spectrumMode === 'loop' && selection !== null;
+  const rangeStart = showLoop ? selection.start : liveTime;
+  const rangeEnd = showLoop ? selection.end : liveTime;
+
+  const analysis = useMemo(
+    () => (audioBuffer ? analyseSelection(audioBuffer, rangeStart, rangeEnd) : null),
+    [audioBuffer, rangeStart, rangeEnd]
+  );
+
+  // Chord the transcription timeline shows at the same moment, spelled with
+  // flats like the spectrum's guesses so the two can be compared
+  const timelineChord = useMemo(() => {
+    const mid = (rangeStart + rangeEnd) / 2;
+    const active = chords.reduce((prev: ChordData | null, curr) => (curr.time <= mid ? curr : prev), null);
+    return active ? active.chord.replace('A#', 'Bb').replace('D#', 'Eb').replace('G#', 'Ab') : null;
+  }, [chords, rangeStart, rangeEnd]);
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setError(null);
+    setAudioBuffer(null);
     const url = URL.createObjectURL(file);
     setAudioUrl(url);
 
@@ -28,6 +55,7 @@ export default function Home() {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      setAudioBuffer(audioBuffer);
 
       const result = await transcribeAudio(audioBuffer);
 
@@ -116,7 +144,18 @@ export default function Home() {
           </div>
         ) : (
           <>
-            <WavesurferPlayer url={audioUrl} onTimeUpdate={onTimeUpdate} />
+            <WavesurferPlayer url={audioUrl} onTimeUpdate={onTimeUpdate} onSelectionChange={setSelection} />
+
+            {audioBuffer && (
+              <SpectrumPanel
+                analysis={analysis}
+                mode={showLoop ? 'loop' : 'live'}
+                onModeChange={setSpectrumMode}
+                range={{ start: rangeStart, end: rangeEnd }}
+                hasSelection={selection !== null}
+                timelineChord={timelineChord}
+              />
+            )}
 
             {isTranscribing ? (
               <div className="flex flex-col items-center gap-4 mt-12">
