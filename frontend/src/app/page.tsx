@@ -6,6 +6,7 @@ import { WavesurferPlayer, type Selection } from '@/components/WavesurferPlayer'
 import { ChordDisplay } from '@/components/ChordDisplay';
 import { SpectrumPanel, type SpectrumMode } from '@/components/SpectrumPanel';
 import { analyseSelection } from '@/lib/pitchAnalysis';
+import { chordsToMidi } from '@/lib/midiExport';
 import { useChordTranscriber } from '@/hooks/useChordTranscriber';
 import type { ChordData } from '@/types/audio';
 
@@ -94,23 +95,17 @@ export default function Home() {
     setCurrentChord(activeChord ? activeChord.chord : null);
   }, [chords]);
 
-  const handleExportMidi = useCallback(async () => {
+  const handleExportMidi = useCallback(() => {
     if (chords.length === 0) return;
 
-    try {
-      const response = await fetch('http://localhost:8001/midi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chords }),
-      });
-
-      const data = await response.json();
-      if (data.midi_url) {
-        window.open(`http://localhost:8001${data.midi_url}`, '_blank');
-      }
-    } catch (err) {
-      console.error("Failed to export MIDI", err);
-    }
+    // Generated in the browser, so no backend server is needed
+    const midi = chordsToMidi(chords);
+    const url = URL.createObjectURL(new Blob([midi.buffer as ArrayBuffer], { type: 'audio/midi' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'transcription.mid';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [chords]);
 
   return (
