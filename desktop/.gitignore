@@ -1,0 +1,5 @@
+node_modules/
+# Copied from frontend/out at build time
+web/
+# CI build output
+release/

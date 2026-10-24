@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Build to plain static files in out/, so the desktop app can bundle them with no server
+  output: "export",
   turbopack: {},
   webpack: (config, { isServer }) => {
     config.experiments = {

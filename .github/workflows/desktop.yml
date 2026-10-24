@@ -1,0 +1,59 @@
+# Builds the ChordMagic desktop installers.
+# A .dmg can only be built on macOS, so this runs on GitHub's Mac (and Windows) runners.
+# Run it from the Actions tab ("Build desktop apps" -> "Run workflow"), or push a tag like v0.1.0.
+# The installers appear as downloadable artifacts on the finished run.
+
+name: Build desktop apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: --mac
+            artifact: ChordMagic-macOS
+            files: desktop/release/*.dmg
+          - os: windows-latest
+            target: --win
+            artifact: ChordMagic-Windows
+            files: desktop/release/*.exe
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix desktop
+
+      - name: Build web app
+        working-directory: desktop
+        run: npm run build:web
+
+      - name: Package installers
+        working-directory: desktop
+        # Output inside the repo here, rather than the local "ChordMagic Installers" folder
+        run: npx electron-builder ${{ matrix.target }} --publish never --config.directories.output=release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error

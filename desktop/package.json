@@ -1,0 +1,60 @@
+{
+  "name": "chordmagic-desktop",
+  "productName": "ChordMagic",
+  "version": "0.1.0",
+  "description": "Chord transcription with a live piano spectrum",
+  "author": "eamobire",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "build:web": "npm --prefix ../frontend run build && node scripts/copy-web.js",
+    "start": "npm run build:web && electron .",
+    "dist:win": "npm run build:web && electron-builder --win",
+    "dist:mac": "npm run build:web && electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.eamobire.chordmagic",
+    "productName": "ChordMagic",
+    "directories": {
+      "output": "../../ChordMagic Installers",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "web/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
+    },
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "identity": "-"
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
+  }
+}
